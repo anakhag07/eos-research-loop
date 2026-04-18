@@ -1,0 +1,52 @@
+schema_version: 1
+
+# Budget fence for autonomous sbatch submission.
+# The tick never submits when any of these are violated.
+queue:
+  # Only advance a hypothesis stage when the user's full squeue is empty.
+  # (Monitors in-flight jobs; does not submit new ones while any are pending
+  # or running.)
+  must_be_empty: true
+
+jobs:
+  max_new_jobs_per_tick: 20
+  probe_steps: 500              # short probe-run length before committing to a stage
+  probe_timeout_minutes: 30     # halt the probe if wall-clock exceeds this
+
+allowed:
+  models: [mlp, cnn, resnet]
+  optimizers: [sgd, fullgd, adam]
+  # Only these lr tuples can be auto-submitted. Anything outside halts for user.
+  lrs: [0.005, 0.01, 0.02, 0.05, 0.1]
+  losses: [mse, ce]
+  lmax_schedules: [none, drop]
+  max_steps_per_job: 8000
+
+eos:
+  # Entering EoS is the gating phenomenon we care about. A stage can't
+  # advance past a probe unless the probe's global.eos_crossing.lambda_max.step
+  # is not null and matches the expected threshold for the optimizer family.
+  sgd_threshold: "2/eta"
+  fullgd_threshold: "2/eta"
+  adam_threshold: "38/eta"
+
+verification_stages:
+  # Ladder walked by H_primary. Each stage has a gate: auto (passes on score)
+  # or visual (halts for user `confirm`).
+  - name: seed_1
+    config: {model: mlp, optimizer: fullgd, loss: mse, seeds: [7777]}
+    gate: visual
+  - name: seeds_N
+    config: {model: mlp, optimizer: fullgd, loss: mse, seeds: [7777, 1234, 2718, 3141, 5926]}
+    gate: auto
+    score: "sign(boundary - x_outlier) consistent across >= 4/5 seeds"
+  - name: archs
+    config: {models: [mlp, cnn, resnet], optimizer: fullgd, loss: mse, seeds: [7777, 1234, 2718]}
+    gate: visual
+  - name: losses
+    config: {models: [mlp, cnn, resnet], optimizer: fullgd, losses: [mse, ce], seeds: [7777, 1234, 2718]}
+    gate: visual
+  - name: optimizers
+    # Adam: 38/eta threshold
+    config: {models: [mlp], optimizers: [fullgd, sgd, adam], losses: [mse, ce], seeds: [7777, 1234, 2718]}
+    gate: visual

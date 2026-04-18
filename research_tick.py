@@ -7,7 +7,7 @@ Steps:
   3. For each open hypothesis, call its proposal generator:
        - emits a dry-run launch_ablation.sh command and a paired --run form,
        - or emits an "infra-blocked" note if a required primitive/extension is missing.
-  4. Write reports/<ts>/report.md bundling digests + proposals.
+  4. Write research-tick-results/ticks/<ts>/report.md bundling digests + proposals.
   5. Append a dated decision-log line to each hypothesis's markdown file.
   6. Rerun `hypotheses/rebuild_index.py`.
 
@@ -36,7 +36,11 @@ from typing import Any, Callable, Dict, List, Optional
 REPO_ROOT = Path(__file__).resolve().parent
 SCRIPTS_DIR = REPO_ROOT / "eoss_training_scripts"
 HYPOTHESES_DIR = REPO_ROOT / "hypotheses"
-REPORTS_DIR = REPO_ROOT / "reports"
+RESULTS_ROOT = REPO_ROOT / "research-tick-results"
+REPORTS_DIR = RESULTS_ROOT / "ticks"
+PROBES_DIR = RESULTS_ROOT / "probes"
+VERIFICATION_DIR = RESULTS_ROOT / "verification"
+BUDGET_FILE = RESULTS_ROOT / "budget.yaml"
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n(.*)$", re.DOTALL)
 
 
@@ -60,6 +64,102 @@ class Proposal:
     run_cmd: Optional[str] = None
     infra_note: Optional[str] = None
     signals_to_watch: List[str] = field(default_factory=list)
+
+
+# ---------- budget + queue guard ---------- #
+
+@dataclass
+class QueueState:
+    empty: bool
+    pending: List[str] = field(default_factory=list)
+    running: List[str] = field(default_factory=list)
+
+
+def queue_guard() -> QueueState:
+    """Return the user's current slurm queue state.
+
+    The tick's budget rule is: advance a hypothesis stage only when the queue
+    is entirely empty. If anything is pending or running, we monitor and exit
+    without submitting.
+    """
+    user = os.environ.get("USER", "")
+    if not user:
+        return QueueState(empty=True)
+    try:
+        out = subprocess.run(
+            ["squeue", "-u", user, "--noheader", "--format=%i %T"],
+            capture_output=True, text=True, check=False, timeout=30,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return QueueState(empty=True)
+    pending, running = [], []
+    for line in out.stdout.splitlines():
+        parts = line.strip().split()
+        if len(parts) < 2:
+            continue
+        jid, state = parts[0], parts[1]
+        if state == "PENDING":
+            pending.append(jid)
+        elif state == "RUNNING":
+            running.append(jid)
+    return QueueState(empty=not (pending or running), pending=pending, running=running)
+
+
+def load_budget() -> Dict[str, Any]:
+    """Minimal YAML-ish reader — we only consume scalar + list fields, not deep nesting."""
+    if not BUDGET_FILE.exists():
+        return {}
+    # Defer to PyYAML if available; else lean on the frontmatter parser shape.
+    try:
+        import yaml  # type: ignore
+        return yaml.safe_load(BUDGET_FILE.read_text(encoding="utf-8")) or {}
+    except ImportError:
+        # Conservative fallback: tick will treat budget as empty -> cautious defaults.
+        return {}
+
+
+def submit_probe(*, hypothesis_id: str, stage: str, model: str, optimizer: str,
+                 lr: float, loss: str, project_name: str,
+                 probe_steps: int = 500, input_proto_counts: Optional[Dict[str, int]] = None,
+                 dry_run: bool = True) -> Dict[str, Any]:
+    """Render a short probe-run launch command.
+
+    The probe submits ONE job with reduced STEPS to verify that the EoS crossing
+    (lambda_max >= 2/eta for sgd/fullgd, 38/eta for adam) is reachable under the
+    stage's hyperparameters before committing to the full verification sweep.
+    Returns {"cmd": <str>, "project": <str>}. Execution is left to the caller so
+    the tick can choose to auto-submit (queue empty + under budget) or emit a
+    dry-run for the user.
+    """
+    counts = input_proto_counts or {"boundary": 10, "inliers": 10, "x_outlier": 5, "y_outlier": 5}
+    parts = [
+        "bash eoss_training_scripts/launch_ablation.sh --custom",
+        f'--models "{model}"',
+        f'--optimizers "{optimizer}"',
+        f'--lrs "{lr}"',
+        '--batches "128"',
+        f'--loss "{loss}"',
+        '--lmax-schedule "none"',
+        '--input-prototypes-modes "val"',
+        '--input-prototype-sources "generate"',
+        f'--input-boundary-counts "{counts.get("boundary", 10)}"',
+        f'--input-inliers-counts "{counts.get("inliers", 10)}"',
+        f'--input-x-outlier-counts "{counts.get("x_outlier", 5)}"',
+        f'--input-y-outlier-counts "{counts.get("y_outlier", 5)}"',
+        f'--steps {probe_steps}',
+        f'--project-name "{project_name}"',
+    ]
+    if not dry_run:
+        parts.append("--run")
+    cmd = " \\\n    ".join(parts)
+    return {
+        "cmd": cmd,
+        "project": project_name,
+        "kind": "probe",
+        "hypothesis_id": hypothesis_id,
+        "stage": stage,
+        "probe_steps": probe_steps,
+    }
 
 
 # ---------- frontmatter (minimal, no PyYAML dep) ---------- #

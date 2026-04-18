@@ -12,12 +12,13 @@ eos_datasets/
 eos_results/
 test_eoss/
 
-# Tick outputs (keep folder, ignore contents)
-research-tick-results/ticks/
-research-tick-results/probes/
-research-tick-results/verification/
-research-tick-results/drafts/
-research-tick-results/archive/
+# Tick outputs (keep folder + .gitkeep, ignore everything else inside)
+research-tick-results/ticks/*
+research-tick-results/probes/*
+research-tick-results/verification/*
+research-tick-results/drafts/*
+research-tick-results/archive/*
+!research-tick-results/*/.gitkeep
 
 # Legacy output dirs (pre-consolidation; ignored but still in archive/)
 reports/

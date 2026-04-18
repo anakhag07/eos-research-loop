@@ -1708,7 +1708,8 @@ def apply_overrides(cfg, args):
     elif args.headless:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         cfg["save_dir"] = str(
-            Path(__file__).resolve().parent / "plots" / cfg["project_name"] / ts
+            Path(__file__).resolve().parent / "research-tick-results" / "ticks" / ts
+            / "plots" / cfg["project_name"]
         )
     if args.headless:
         args.no_show = True
