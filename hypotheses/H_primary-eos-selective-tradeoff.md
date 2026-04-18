@@ -93,3 +93,4 @@ configuration at each stage.
 
 <!-- append-only: YYYY-MM-DD — <tick/sweep_id> — <status change> — <note> -->
 - 2026-04-18 — created as collapse of H01–H04; initial stage `seed_1`.
+- 2026-04-18 — tick `20260418_192415` — proposed sweep `eoss-Hprimary-seed_1` (awaiting authorization).

@@ -313,27 +313,43 @@ def propose_H02(hyp: Hypothesis, project_base: str) -> Proposal:
 
 
 def propose_H03(hyp: Hypothesis, project_base: str) -> Proposal:
+    """Now that infra is in place, propose a sweep that exercises per-group
+    grad_vmax_cos2 and loss_decline_onset on the canonical MLP-fullGD config.
+    """
+    project_name = f"{project_base}-H03-cos-lead"
+    base = [
+        "bash eoss_training_scripts/launch_ablation.sh --custom",
+        '--models "mlp"',
+        '--optimizers "fullgd"',
+        '--lrs "0.05"',
+        '--batches "128"',
+        '--loss "mse"',
+        '--lmax-schedule "none"',
+        '--input-prototypes-modes "val"',
+        '--input-prototype-sources "generate"',
+        '--input-boundary-counts "10"',
+        '--input-inliers-counts "10"',
+        '--input-x-outlier-counts "5"',
+        '--input-y-outlier-counts "5"',
+        f'--project-name "{project_name}"',
+    ]
+    dry, run = _dry_and_run(base)
     return Proposal(
         hypothesis_id=hyp.id,
-        kind="infra",
-        project_name="",
+        kind="sweep",
+        project_name=project_name,
         summary=(
-            "Blocked on infra: the digest does not currently extract per-group "
-            "`grad_vmax_cos2` crossings nor a forward-window slope onset for `full_loss`. "
-            "Both are small additions."
+            "Infra landed (eos_signals v2 + sweep_digest per-group cos_crossing / "
+            "loss_decline_onset). Run MLP-fullGD-mse at the canonical composition and "
+            "check whether `group.<g>.cos_crossing.grad_vmax_cos2.step` precedes "
+            "`group.<g>.loss_decline_onset.full_loss.step` per prototype group."
         ),
-        infra_note=(
-            "1) Add `grad_vmax_cos2` to `GROUP_METRIC_SUFFIXES` in sweep_digest.py and "
-            "emit `group.<g>.cos_crossing.grad_vmax_cos2.step` via `crossing_step` with "
-            "a threshold of 0.5 (tune later).\n"
-            "2) Add a new primitive to `eos_signals.primitives`: "
-            "`first_window_with_negative_slope(df, step_col, metric_col, window, slope_max)` "
-            "→ returns earliest window where slope <= slope_max. Register in "
-            "`registry.yaml` (schema_version bump). Apply to `group.<g>.full_loss`."
-        ),
+        dry_run_cmd=dry,
+        run_cmd=run,
         signals_to_watch=[
-            "group.<g>.cos_crossing.grad_vmax_cos2.step  (needs infra)",
-            "group.<g>.loss_decline_onset.full_loss.step  (needs new primitive)",
+            "group.<g>.cos_crossing.grad_vmax_cos2.step",
+            "group.<g>.loss_decline_onset.full_loss.step",
+            "group.<g>.loss_decline_onset.full_loss.slope",
         ],
     )
 
@@ -375,7 +391,246 @@ def propose_H04(hyp: Hypothesis, project_base: str) -> Proposal:
     )
 
 
+# ---------- H_primary stage machine ---------- #
+
+LADDER_STAGES = ["seed_1", "seeds_N", "archs", "losses", "optimizers"]
+
+
+def _stage_config(budget: Dict[str, Any], stage_name: str) -> Optional[Dict[str, Any]]:
+    for entry in (budget.get("verification_stages") or []):
+        if entry.get("name") == stage_name:
+            return entry
+    return None
+
+
+def _plural(key_singular: str, key_plural: str, cfg: Dict[str, Any]) -> Optional[List[Any]]:
+    """Read either plural or singular variant from a stage config."""
+    if key_plural in cfg:
+        v = cfg[key_plural]
+        return v if isinstance(v, list) else [v]
+    if key_singular in cfg:
+        v = cfg[key_singular]
+        return v if isinstance(v, list) else [v]
+    return None
+
+
+def _read_stage_decision(hyp_id: str, stage_name: str) -> Optional[Dict[str, Any]]:
+    """Read research-tick-results/verification/<Hxx>/<stage>/DECISION.md frontmatter.
+
+    Expected shape:
+        ---
+        result: pass | fail | pending
+        figure: <relative png>
+        note: <one-liner>
+        ---
+    Returns the parsed frontmatter dict, or None if the file is absent.
+    """
+    p = VERIFICATION_DIR / hyp_id / stage_name / "DECISION.md"
+    if not p.exists():
+        return None
+    try:
+        fm, _ = _parse_frontmatter(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    return fm or {}
+
+
+def _next_stage(stage_name: str) -> Optional[str]:
+    try:
+        i = LADDER_STAGES.index(stage_name)
+    except ValueError:
+        return None
+    if i + 1 >= len(LADDER_STAGES):
+        return None
+    return LADDER_STAGES[i + 1]
+
+
+def _render_probe_for_stage(*, project_name: str, cfg: Dict[str, Any],
+                            probe_steps: int) -> tuple[str, str, List[str]]:
+    """Build a launch_ablation.sh command from a verification_stages entry.
+
+    Returns (dry_cmd, run_cmd, warnings). Warnings note config elements the
+    launcher can't express yet (e.g. multi-seed, multi-loss on the same run),
+    so the report can flag them to the user.
+    """
+    models = _plural("model", "models", cfg) or ["mlp"]
+    opts = _plural("optimizer", "optimizers", cfg) or ["fullgd"]
+    losses = _plural("loss", "losses", cfg) or ["mse"]
+    seeds = cfg.get("seeds") or [7777]
+
+    warnings: List[str] = []
+    if len(seeds) > 1:
+        warnings.append(
+            f"Stage requests {len(seeds)} seeds ({seeds}) but launch_ablation.sh has no "
+            f"--seeds flag. Probe will run with the launcher's default seed; add --seeds "
+            f"support to the launcher before completing this stage."
+        )
+    if len(losses) > 1:
+        warnings.append(
+            f"Stage requests multiple losses {losses}; launch_ablation.sh accepts a single "
+            f"--loss. Probe will run with loss={losses[0]}; rerun separately for each."
+        )
+
+    parts = [
+        "bash eoss_training_scripts/launch_ablation.sh --custom",
+        f'--models "{" ".join(str(m) for m in models)}"',
+        f'--optimizers "{" ".join(str(o) for o in opts)}"',
+        '--lrs "0.05"',
+        '--batches "128"',
+        f'--loss "{losses[0]}"',
+        '--lmax-schedule "none"',
+        '--input-prototypes-modes "val"',
+        '--input-prototype-sources "generate"',
+        '--input-boundary-counts "10"',
+        '--input-inliers-counts "10"',
+        '--input-x-outlier-counts "5"',
+        '--input-y-outlier-counts "5"',
+        f'--steps {probe_steps}',
+        f'--project-name "{project_name}"',
+    ]
+    dry, run = _dry_and_run(parts)
+    return dry, run, warnings
+
+
+def propose_H_primary(hyp: Hypothesis, project_base: str) -> Proposal:
+    """Stage-aware proposer for the primary EoS-selective-tradeoff claim.
+
+    Reads `stage:` from the hypothesis frontmatter and renders a probe for
+    that stage's config (per research-tick-results/budget.yaml:verification_stages).
+    If a DECISION.md for the current stage already says `result: pass`, proposes
+    the *next* stage's probe instead and notes that the user should bump `stage:`.
+    """
+    budget = load_budget()
+    current_stage = str(hyp.frontmatter.get("stage") or "seed_1").strip()
+    probe_steps = int((budget.get("jobs") or {}).get("probe_steps", 500))
+
+    decision = _read_stage_decision(hyp.id, current_stage)
+    advance_note = ""
+    stage_to_run = current_stage
+    if decision and str(decision.get("result", "")).lower() == "pass":
+        nxt = _next_stage(current_stage)
+        if nxt:
+            stage_to_run = nxt
+            advance_note = (
+                f"Stage `{current_stage}` is marked pass in "
+                f"`verification/{hyp.id}/{current_stage}/DECISION.md` — bumping probe to `{stage_to_run}`. "
+                f"Also update `stage:` in H_primary frontmatter."
+            )
+        else:
+            return Proposal(
+                hypothesis_id=hyp.id,
+                kind="skip",
+                project_name="",
+                summary=(
+                    f"Ladder complete — all stages {LADDER_STAGES} passed. "
+                    f"H_primary ready for Phase E (draft.tex writer)."
+                ),
+            )
+
+    cfg = _stage_config(budget, stage_to_run)
+    if cfg is None:
+        return Proposal(
+            hypothesis_id=hyp.id,
+            kind="skip",
+            project_name="",
+            summary=(
+                f"No entry for stage `{stage_to_run}` in budget.yaml:verification_stages. "
+                f"Add one before the tick can propose a probe."
+            ),
+        )
+
+    # Budget fence: queue must be empty.
+    qs = queue_guard()
+    fence_note = ""
+    must_be_empty = bool((budget.get("queue") or {}).get("must_be_empty", True))
+    if must_be_empty and not qs.empty:
+        fence_note = (
+            f"\n\n**Budget fence:** queue is NOT empty ({len(qs.running)} running, "
+            f"{len(qs.pending)} pending). Per `budget.yaml:queue.must_be_empty`, this "
+            f"probe is proposed but not auto-submittable until the queue drains."
+        )
+
+    project_name = f"{project_base}-Hprimary-{stage_to_run}"
+    dry, run, warnings = _render_probe_for_stage(
+        project_name=project_name, cfg=cfg.get("config") or {}, probe_steps=probe_steps,
+    )
+    gate = cfg.get("gate", "visual")
+    score = cfg.get("score")
+
+    summary_lines = [
+        f"H_primary stage `{stage_to_run}` probe ({probe_steps} steps) — gate: {gate}.",
+    ]
+    if score:
+        summary_lines.append(f"Auto-score criterion: `{score}`.")
+    if advance_note:
+        summary_lines.append(advance_note)
+    for w in warnings:
+        summary_lines.append(f"⚠ {w}")
+    summary_lines.append(
+        "On completion, digest the resulting W&B project, pick the key per-group plot, "
+        f"and save it to `verification/{hyp.id}/{stage_to_run}/key_figure.png` plus "
+        f"a `DECISION.md` with `result: pass|fail`."
+    )
+    summary = " ".join(summary_lines) + fence_note
+
+    return Proposal(
+        hypothesis_id=hyp.id,
+        kind="sweep",
+        project_name=project_name,
+        summary=summary,
+        dry_run_cmd=dry,
+        run_cmd=run,
+        signals_to_watch=[
+            "group.<g>.eos_crossing.lambda_max.step",
+            "group.<g>.loss_decline_onset.full_loss.step",
+            "group.<g>.cos_crossing.grad_vmax_cos2.step",
+            "group.<g>.stability_ratio.mean",
+            "group_separation.full_loss.ratio",
+        ],
+    )
+
+
+def propose_fork(*, hypothesis_id: str, parent_run_id: str, cont_step: int,
+                 lr_baseline: float, lr_exit_ratio: float = 0.1,
+                 project_name: str) -> Proposal:
+    """Propose a fork-intervention triplet at t*.
+
+    Emits an infra proposal because launch_ablation.sh / train_eoss.py don't yet
+    support `--cont-run-id` / `--cont-step` / `--lr-drop-at-step`. The proposal
+    carries the concrete patch sketch and the target run parameters so the
+    user can authorize the infra work separately.
+    """
+    lr_exit = lr_baseline * lr_exit_ratio
+    return Proposal(
+        hypothesis_id=hypothesis_id,
+        kind="infra",
+        project_name=project_name,
+        summary=(
+            f"Fork proposal: resume W&B run `{parent_run_id}` at step {cont_step} "
+            f"(first global 2/η crossing), launch two siblings — baseline (lr={lr_baseline}) "
+            f"and exit (lr={lr_exit}) — and compare per-group loss/curvature divergence "
+            f"between forks. Requires launcher + training support for checkpoint resume "
+            f"and mid-run lr drop."
+        ),
+        infra_note=(
+            "Training-side: add `--cont-run-id` (W&B run id) and `--cont-step` (int) to\n"
+            "`edge-of-stochastic-stability-and-memorization/training.py`; on load, restore\n"
+            "model + optimizer state from the parent checkpoint at that step.\n"
+            "Add `--lr-drop-at-step STEP:RATIO` (e.g. `T:0.1` → at step T drop lr ×0.1).\n\n"
+            "Launcher-side: expose matching flags in `launch_ablation.sh` and thread them\n"
+            "into the `sbatch` exports. Once wired, this proposer converts to `kind: sweep`\n"
+            "emitting three sbatch jobs per fork point (shared trajectory + baseline + exit)."
+        ),
+        signals_to_watch=[
+            "group.<g>.loss_decline_onset.full_loss.step  (per fork)",
+            "group.<g>.stability_ratio.mean  (baseline vs exit)",
+            "group_separation.full_loss.ratio  (diverges post-fork?)",
+        ],
+    )
+
+
 PROPOSERS: Dict[str, Callable[[Hypothesis, str], Proposal]] = {
+    "H_primary-eos-selective-tradeoff": propose_H_primary,
     "H01-lambda-learning-covariance": propose_H01,
     "H02-stability-ratio-group-separator": propose_H02,
     "H03-cosine-precedes-loss-drop": propose_H03,
@@ -515,8 +770,8 @@ def main() -> int:
         else:
             digest_dirs[proj] = _run_digest(proj, report_dir, args.samples)
 
-    hypotheses = [h for h in _load_hypotheses() if h.status == "open"]
-    print(f"[tick] {len(hypotheses)} open hypotheses")
+    hypotheses = [h for h in _load_hypotheses() if h.status in ("open", "ready")]
+    print(f"[tick] {len(hypotheses)} active hypotheses (open|ready)")
 
     proposals: List[Proposal] = []
     for hyp in hypotheses:
