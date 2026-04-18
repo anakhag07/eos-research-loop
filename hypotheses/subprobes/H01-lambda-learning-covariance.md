@@ -1,6 +1,7 @@
 ---
 id: H01-lambda-learning-covariance
 title: lambda_max co-varies with learning on specific prototype groups
+parent: H_primary-eos-selective-tradeoff
 status: open
 linked_sweeps: []
 evidence: []
@@ -45,3 +46,4 @@ the co-variance is real; if random, refuted.
 - 2026-04-18 — resubmitted `eoss-H01-proto-counts` (slurm jobs 12170904–12170912) after pool-size fix.
 - 2026-04-18 — cancelled 12170904–12170912 to preempt inf/nan after first steps; lowered default `INIT_SCALE` 0.2→0.05 in `train_eoss.slurm`; resubmitted as 12171216–12171224.
 - 2026-04-18 — tick `20260418_142104` — proposed sweep `eoss-H01-proto-counts` (awaiting authorization).
+- 2026-04-18 — tick `20260418_185022` — proposed sweep `eoss-H01-proto-counts` (awaiting authorization).

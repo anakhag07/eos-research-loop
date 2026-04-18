@@ -199,7 +199,7 @@ def _parse_frontmatter(text: str) -> tuple[Dict[str, Any], str]:
 
 def _load_hypotheses() -> List[Hypothesis]:
     out = []
-    for p in sorted(HYPOTHESES_DIR.glob("H*.md")):
+    for p in sorted(HYPOTHESES_DIR.rglob("H*.md")):
         if p.name == "INDEX.md":
             continue
         text = p.read_text(encoding="utf-8")

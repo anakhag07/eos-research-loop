@@ -1,6 +1,7 @@
 ---
 id: H03-cosine-precedes-loss-drop
 title: cosine-alignment metrics precede reductions in subset-group loss
+parent: H_primary-eos-selective-tradeoff
 status: ready
 linked_sweeps: []
 evidence: []

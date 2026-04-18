@@ -1,6 +1,7 @@
 ---
 id: H02-stability-ratio-group-separator
 title: stability_ratio separates prototype groups better than raw grad_hessian_grad or lambda_max
+parent: H_primary-eos-selective-tradeoff
 status: open
 linked_sweeps: []
 evidence: []
@@ -47,3 +48,4 @@ before running a dedicated sweep.
 - 2026-04-18 — tick `20260418_102905` — infra-blocked: Blocked on infra: `sweep_digest.py` emits `stability_ratio` only as a per-group scalar. To compare group separation *on the ratio*, the digest needs to materialize the ratio as a time series per group and pass those DataFrames to `group_separation`.
 - 2026-04-18 — tick `20260418_104807` — infra-blocked: Blocked on infra: `sweep_digest.py` emits `stability_ratio` only as a per-group scalar. To compare group separation *on the ratio*, the digest needs to materialize the ratio as a time series per group and pass those DataFrames to `group_separation`.
 - 2026-04-18 — tick `20260418_142104` — infra-blocked: Blocked on infra: `sweep_digest.py` emits `stability_ratio` only as a per-group scalar. To compare group separation *on the ratio*, the digest needs to materialize the ratio as a time series per group and pass those DataFrames to `group_separation`.
+- 2026-04-18 — tick `20260418_185022` — infra-blocked: Blocked on infra: `sweep_digest.py` emits `stability_ratio` only as a per-group scalar. To compare group separation *on the ratio*, the digest needs to materialize the ratio as a time series per group and pass those DataFrames to `group_separation`.
