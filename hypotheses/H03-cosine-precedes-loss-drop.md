@@ -1,7 +1,7 @@
 ---
 id: H03-cosine-precedes-loss-drop
 title: cosine-alignment metrics precede reductions in subset-group loss
-status: open
+status: ready
 linked_sweeps: []
 evidence: []
 created: 2026-04-18
@@ -46,3 +46,4 @@ Stage 5 signal proposal.
 - 2026-04-18 — tick `20260418_102905` — infra-blocked: Blocked on infra: the digest does not currently extract per-group `grad_vmax_cos2` crossings nor a forward-window slope onset for `full_loss`. Both are small additions.
 - 2026-04-18 — tick `20260418_104807` — infra-blocked: Blocked on infra: the digest does not currently extract per-group `grad_vmax_cos2` crossings nor a forward-window slope onset for `full_loss`. Both are small additions.
 - 2026-04-18 — tick `20260418_142104` — infra-blocked: Blocked on infra: the digest does not currently extract per-group `grad_vmax_cos2` crossings nor a forward-window slope onset for `full_loss`. Both are small additions.
+- 2026-04-18 — infra — unblocked: added `first_window_with_negative_slope` primitive (eos_signals schema v2) and extended `sweep_digest.py:_run_group_signals` to emit `group.<g>.cos_crossing.grad_vmax_cos2.{step,value_at_step}` (threshold 0.1) and `group.<g>.loss_decline_onset.full_loss.{step,slope,r2}` (window=10, min_r2=0.5). Next tick will have these fields available for every prototype group.

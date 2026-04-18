@@ -7,7 +7,7 @@
 # Each primitive's `inputs` are the required arguments besides the raw
 # history DataFrame (which is always provided as df, step_col, metric_col).
 
-schema_version: 1
+schema_version: 2
 
 primitives:
   - name: eos_threshold
@@ -44,6 +44,17 @@ primitives:
       Linear-regression slope of metric vs. step over an optional window.
       Useful for quantifying post-crossing drift in lambda_max or subset loss.
     source: eos_signals.primitives:slope_in_window
+
+  - name: first_window_with_negative_slope
+    inputs: [window, slope_threshold, min_r2, start_step]
+    returns: {step: int?, slope: float?, r2: float?, window: int, n: int, slope_threshold: float, start_step: float?}
+    description: >
+      First step at which a forward rolling window of `window` samples has
+      slope < slope_threshold (default 0.0 — sustained decline onset).
+      Intended for detecting when a metric (e.g. per-group full_loss) begins
+      its first durable decline. Pair with `crossing_step` on `grad_vmax_cos2`
+      to test whether cosine alignment precedes subset-loss drops (H03).
+    source: eos_signals.primitives:first_window_with_negative_slope
 
   - name: plateau_duration
     inputs: [tolerance, min_length]

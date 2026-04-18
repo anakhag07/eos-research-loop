@@ -147,6 +147,64 @@ def slope_in_window(
     }
 
 
+def first_window_with_negative_slope(
+    df: pd.DataFrame,
+    step_col: str,
+    metric_col: str,
+    *,
+    window: int = 10,
+    slope_threshold: float = 0.0,
+    min_r2: Optional[float] = None,
+    start_step: Optional[float] = None,
+) -> Dict[str, object]:
+    """First step at which a forward rolling window has slope < slope_threshold.
+
+    Walks sorted samples left-to-right; for each index i fits a line over
+    samples [i, i+window) and returns the step at index i of the first window
+    whose slope is below slope_threshold (default 0.0 — sustained decline).
+    If min_r2 is set, requires r2 >= min_r2 to accept the window.
+
+    Returns {step, slope, r2, window, n, slope_threshold, start_step}. step is
+    None if no qualifying window exists.
+    """
+    clean = _clean_df(df, step_col, metric_col)
+    if start_step is not None:
+        clean = clean[clean[step_col] >= start_step].reset_index(drop=True)
+    n = len(clean)
+    base = {
+        "step": None, "slope": None, "r2": None, "window": int(window),
+        "n": int(n), "slope_threshold": float(slope_threshold),
+        "start_step": _as_float(start_step),
+    }
+    if n < window:
+        return base
+    x = clean[step_col].to_numpy(dtype=float)
+    y = clean[metric_col].to_numpy(dtype=float)
+    for i in range(n - window + 1):
+        xi = x[i:i + window]
+        yi = y[i:i + window]
+        slope, intercept = np.polyfit(xi, yi, 1)
+        if slope >= slope_threshold:
+            continue
+        if min_r2 is not None:
+            y_hat = slope * xi + intercept
+            ss_res = float(np.sum((yi - y_hat) ** 2))
+            ss_tot = float(np.sum((yi - yi.mean()) ** 2))
+            r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else None
+            if r2 is None or r2 < min_r2:
+                continue
+            base["r2"] = _as_float(r2)
+        else:
+            y_hat = slope * xi + intercept
+            ss_res = float(np.sum((yi - y_hat) ** 2))
+            ss_tot = float(np.sum((yi - yi.mean()) ** 2))
+            base["r2"] = _as_float(1.0 - (ss_res / ss_tot) if ss_tot > 0 else None)
+        base["step"] = int(xi[0])
+        base["slope"] = _as_float(slope)
+        return base
+    return base
+
+
 def plateau_duration(
     df: pd.DataFrame,
     step_col: str,
