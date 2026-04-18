@@ -19,6 +19,10 @@ research-tick-results/verification/*
 research-tick-results/drafts/*
 research-tick-results/archive/*
 !research-tick-results/*/.gitkeep
+# Verification: track the curated decisions and key figures (state-machine inputs)
+!research-tick-results/verification/**/
+!research-tick-results/verification/**/DECISION.md
+!research-tick-results/verification/**/key_figure.png
 
 # Legacy output dirs (pre-consolidation; ignored but still in archive/)
 reports/
