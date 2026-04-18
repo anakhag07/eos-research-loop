@@ -1,0 +1,78 @@
+# eos_signals primitive registry.
+#
+# This file is the evolving surface of the research loop. When a new primitive
+# is proposed (Stage 5: /propose-signal), it is appended here with a bumped
+# schema_version so digest consumers know their inputs have changed.
+#
+# Each primitive's `inputs` are the required arguments besides the raw
+# history DataFrame (which is always provided as df, step_col, metric_col).
+
+schema_version: 1
+
+primitives:
+  - name: eos_threshold
+    inputs: [eta, adam]
+    returns: float
+    description: >
+      EOS threshold — 2/eta for SGD, 38/eta for Adam-preconditioned lambda.
+      Not a signal on its own, but the building block for threshold-crossing
+      primitives.
+    source: eos_signals.primitives:eos_threshold
+
+  - name: crossing_step
+    inputs: [threshold, direction, start_step, end_step]
+    returns: {step: int?, value_at_step: float?, threshold: float, direction: str, n: int, start_step: float?, end_step: float?}
+    description: >
+      First step at which the metric crosses a numeric threshold within an
+      optional [start_step, end_step] window. direction=up uses metric >=
+      threshold, down uses <=. Use start_step to skip the initialization
+      transient (e.g. the lambda_max spike at step 0).
+    source: eos_signals.primitives:crossing_step
+
+  - name: eos_threshold_crossing
+    inputs: [eta, adam, start_step, end_step]
+    returns: {step: int?, value_at_step: float?, threshold: float, eta: float, adam: bool, threshold_expr: str}
+    description: >
+      Composite: crossing_step with threshold derived from eos_threshold(eta).
+      Intended for lambda_max-style metrics to mark entry into EoS regime.
+    source: eos_signals.primitives:eos_threshold_crossing
+
+  - name: slope_in_window
+    inputs: [start_step, end_step]
+    returns: {slope: float?, intercept: float?, r2: float?, n: int, start_step: float?, end_step: float?}
+    description: >
+      Linear-regression slope of metric vs. step over an optional window.
+      Useful for quantifying post-crossing drift in lambda_max or subset loss.
+    source: eos_signals.primitives:slope_in_window
+
+  - name: plateau_duration
+    inputs: [tolerance, min_length]
+    returns: {start_step: float?, end_step: float?, length: int, mean: float?, tolerance: float}
+    description: >
+      Longest contiguous window where (max - min) of metric <= tolerance.
+      Identifies flat regions in loss or lambda_max — candidate plateaus.
+    source: eos_signals.primitives:plateau_duration
+
+  - name: group_separation
+    inputs: [groups, start_step, end_step]
+    returns: {between_var: float?, within_var: float?, ratio: float?, groups: {str: {n: int, mean: float?, var: float?}}}
+    description: >
+      Ratio of between-group variance to within-group variance for the given
+      metric. Answers "do prototype groups separate on this metric?".
+    source: eos_signals.primitives:group_separation
+
+  - name: stability_ratio_series
+    inputs: [grad_col, lambda_col, smooth_window]
+    returns: DataFrame[step_col, stability_ratio]
+    description: >
+      grad_hessian_grad / lambda_max time series, with optional rolling mean.
+      Auxiliary primitive — use stability_ratio_summary for scalar signal.
+    source: eos_signals.primitives:stability_ratio_series
+
+  - name: stability_ratio_summary
+    inputs: [grad_col, lambda_col, smooth_window]
+    returns: {n: int, median: float?, mean: float?, max: float?, min: float?, last: float?}
+    description: >
+      Scalar summary (n, median, mean, max, min, last) of the stability ratio
+      grad_hessian_grad / lambda_max.
+    source: eos_signals.primitives:stability_ratio_summary

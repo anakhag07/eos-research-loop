@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source /orcd/software/core/001/pkg/miniforge/24.3.0-0/etc/profile.d/conda.sh*)",
+      "Bash(conda activate *)",
+      "Bash(conda deactivate)",
+      "Bash(conda env list)",
+      "Bash(conda info*)",
+      "Bash(python eoss_training_scripts/summarize_wandb_runs.py*)",
+      "Bash(python eoss_training_scripts/sweep_digest.py*)",
+      "Bash(python hypotheses/rebuild_index.py*)",
+      "Bash(python research_tick.py*)",
+      "Bash(python generate_plots_wandb.py --headless*)",
+      "Bash(python -m eos_signals*)",
+      "Bash(python -c*)",
+      "Bash(python3 -c*)",
+      "Bash(bash run-once.sh*)",
+      "Bash(squeue*)",
+      "Bash(sacct*)",
+      "Bash(sinfo*)",
+      "Bash(sacctmgr show*)"
+    ]
+  }
+}

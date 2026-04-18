@@ -1,0 +1,43 @@
+# Nested git repos managed independently
+eoss_training_scripts/
+edge-of-stochastic-stability-and-memorization/
+NeurIPS-2026-Draft/
+
+# W&B output projects
+eoss-*/
+resnet-*/
+train-val-gridsweep-prototypes/
+wandb/
+eos_datasets/
+eos_results/
+test_eoss/
+
+# Tick outputs (keep folder, ignore contents)
+research-tick-results/ticks/
+research-tick-results/probes/
+research-tick-results/verification/
+research-tick-results/drafts/
+research-tick-results/archive/
+
+# Legacy output dirs (pre-consolidation; ignored but still in archive/)
+reports/
+plots/
+digests/
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Claude Code local / ephemeral
+.claude/.nfs*
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
+.claude/settings.local.json
+
+# Editor / OS
+.DS_Store
+*.swp
