@@ -94,3 +94,6 @@ configuration at each stage.
 <!-- append-only: YYYY-MM-DD — <tick/sweep_id> — <status change> — <note> -->
 - 2026-04-18 — created as collapse of H01–H04; initial stage `seed_1`.
 - 2026-04-18 — tick `20260418_192415` — proposed sweep `eoss-Hprimary-seed_1` (awaiting authorization).
+- 2026-04-18 — tick `20260418_192620` — proposed sweep `eoss-Hprimary-seed_1` (awaiting authorization).
+- 2026-04-18 — submitted sweep `eoss-Hprimary-seed_1` (slurm job 12182636, mlp-fullgd-mse-lr0.05, 500-step probe at seed_1 stage).
+- 2026-04-18 — seed_1 DECISION: fail (configuration, not science). Run `mrjq80yn` did not reach EoS (`global.eos_crossing.lambda_max.step: None`; threshold=40) and per-group `subset_metrics_rule` only fired once at step 0 (next cadence step = 512 > 500). Bumped `budget.yaml:jobs.probe_steps` 500→4000 so subset trackers get ~8 samples per run. Staying at stage `seed_1`; next tick re-proposes with 4000 steps. Full analysis + single-point stability-ratio snapshot in `research-tick-results/verification/H_primary-eos-selective-tradeoff/seed_1/DECISION.md`.

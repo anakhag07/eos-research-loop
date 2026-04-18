@@ -10,8 +10,8 @@ queue:
 
 jobs:
   max_new_jobs_per_tick: 20
-  probe_steps: 500              # short probe-run length before committing to a stage
-  probe_timeout_minutes: 30     # halt the probe if wall-clock exceeds this
+  probe_steps: 4000             # ≥ enough for subset_metrics_rule (fires every 512 steps at bs≥32) to produce ~8 per-group samples; also gives lambda_max a realistic window to cross 2/η for full-GD MLP at lr=0.05. Bumped from 500 after seed_1 DECISION(fail) on run mrjq80yn.
+  probe_timeout_minutes: 60     # halt the probe if wall-clock exceeds this
 
 allowed:
   models: [mlp, cnn, resnet]

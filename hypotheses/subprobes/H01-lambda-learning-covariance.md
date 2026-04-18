@@ -48,3 +48,4 @@ the co-variance is real; if random, refuted.
 - 2026-04-18 — tick `20260418_142104` — proposed sweep `eoss-H01-proto-counts` (awaiting authorization).
 - 2026-04-18 — tick `20260418_185022` — proposed sweep `eoss-H01-proto-counts` (awaiting authorization).
 - 2026-04-18 — tick `20260418_192415` — proposed sweep `eoss-H01-proto-counts` (awaiting authorization).
+- 2026-04-18 — tick `20260418_192620` — proposed sweep `eoss-H01-proto-counts` (awaiting authorization).
