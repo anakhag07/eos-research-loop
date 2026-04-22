@@ -1,8 +1,3 @@
-# Nested git repos managed independently
-eoss_training_scripts/
-edge-of-stochastic-stability-and-memorization/
-NeurIPS-2026-Draft/
-
 # W&B output projects
 eoss-*/
 resnet-*/

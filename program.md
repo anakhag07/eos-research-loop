@@ -2,6 +2,8 @@
 
 This is an experiment to have the LLM run queue-aware hyperparameter research over the EoSS training stack.
 
+For the external-facing overview (setup, directory map, verification ladder), see [`README.md`](README.md). This file is the in-session operational guide.
+
 ## Scope
 
 The goal is not generic model tuning. The goal is to find signal in the interaction between curvature and learning on prototype groups.

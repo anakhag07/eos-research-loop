@@ -1,0 +1,12 @@
+[submodule "eoss_training_scripts"]
+	path = eoss_training_scripts
+	url = https://github.com/anakhag07/eoss-experiments.git
+	branch = research
+[submodule "edge-of-stochastic-stability-and-memorization"]
+	path = edge-of-stochastic-stability-and-memorization
+	url = git@github.com:anakhag07/edge-of-stochastic-stability-and-memorization.git
+	branch = research
+[submodule "NeurIPS-2026-Draft"]
+	path = NeurIPS-2026-Draft
+	url = https://github.com/anakhag07/NeurIPS-2026-Draft.git
+	branch = main
