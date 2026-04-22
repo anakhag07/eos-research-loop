@@ -48,3 +48,5 @@ A regime shift = a discontinuity or reordering of these signals across cells.
 - 2026-04-18 — tick `20260418_185022` — proposed sweep `eoss-H04-lr-sweep` (awaiting authorization).
 - 2026-04-18 — tick `20260418_192415` — proposed sweep `eoss-H04-lr-sweep` (awaiting authorization).
 - 2026-04-18 — tick `20260418_192620` — proposed sweep `eoss-H04-lr-sweep` (awaiting authorization).
+- 2026-04-18 — tick `20260418_201921` — proposed sweep `eoss-H04-lr-sweep` (awaiting authorization).
+- 2026-04-18 — tick `20260418_205846` — proposed sweep `eoss-H04-lr-sweep` (awaiting authorization).
