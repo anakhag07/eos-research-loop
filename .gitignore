@@ -6,6 +6,7 @@ wandb/
 eos_datasets/
 eos_results/
 test_eoss/
+.wandb_cache/
 
 # Tick outputs (keep folder + .gitkeep, ignore everything else inside)
 research-tick-results/ticks/*
