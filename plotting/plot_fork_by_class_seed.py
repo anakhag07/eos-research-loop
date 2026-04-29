@@ -110,14 +110,35 @@ def extract_meta(run):
         except (TypeError, ValueError):
             t_star = None
 
+    lr_drop_to = _cfg_val(cfg.get("lr_drop_to", cfg.get("lr-drop-to", None)))
+    lr_drop_at_step = _cfg_val(cfg.get("lr_drop_at_step", cfg.get("lr-drop-at-step", None)))
+    if lr_drop_to is not None:
+        try:
+            lr_drop_to = float(lr_drop_to)
+        except (TypeError, ValueError):
+            lr_drop_to = None
+    if lr_drop_at_step is not None:
+        try:
+            lr_drop_at_step = int(lr_drop_at_step)
+        except (TypeError, ValueError):
+            lr_drop_at_step = None
+
     lmax_drop = _cfg_val(cfg.get("lmax_drop", False))
     drop_mult = _cfg_val(cfg.get("lmax_drop_mult", None)) if lmax_drop else None
     lr_low = lr * drop_mult if (drop_mult is not None and not np.isnan(lr)) else None
 
+    if lr_low is None and lr_drop_to is not None:
+        lr_low = lr_drop_to
+        if not np.isnan(lr) and lr != 0:
+            drop_mult = lr_low / lr
+        if t_star is None:
+            t_star = lr_drop_at_step
+
     if lr_low is None and "lrdrop" in run.name.lower():
         m = re.search(r'lrdrop([0-9.eE+-]+)', run.name, re.IGNORECASE)
         if m:
-            lr_low = lr * float(m.group(1))
+            drop_mult = float(m.group(1))
+            lr_low = lr * drop_mult
 
     init_seed = _cfg_val(cfg.get("init_seed", cfg.get("seed", None)))
     if init_seed is None:
@@ -141,11 +162,10 @@ def extract_meta(run):
         fork_lr_high = float(m_fork_lr.group(1))
         fork_drop = float(m_fork_lr.group(2))
         fork_step = int(m_fork_lr.group(3))
-        if lr_low is None:
-            lr_low = fork_lr_high * fork_drop
-            lr = fork_lr_high
-            drop_mult = fork_drop
-            t_star = fork_step
+        lr_low = fork_lr_high * fork_drop
+        lr = fork_lr_high
+        drop_mult = fork_drop
+        t_star = fork_step
 
     return {
         "lr_high":    lr,

@@ -19,6 +19,7 @@ import json
 import os
 import pickle
 import re
+from pathlib import Path
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -119,16 +120,36 @@ def extract_meta(run):
         except (TypeError, ValueError):
             t_star = None
 
+    lr_drop_to = _cfg_val(cfg.get("lr_drop_to", cfg.get("lr-drop-to", None)))
+    lr_drop_at_step = _cfg_val(cfg.get("lr_drop_at_step", cfg.get("lr-drop-at-step", None)))
+    if lr_drop_to is not None:
+        try:
+            lr_drop_to = float(lr_drop_to)
+        except (TypeError, ValueError):
+            lr_drop_to = None
+    if lr_drop_at_step is not None:
+        try:
+            lr_drop_at_step = int(lr_drop_at_step)
+        except (TypeError, ValueError):
+            lr_drop_at_step = None
+
     lmax_drop = _cfg_val(cfg.get("lmax_drop", False))
     drop_mult = _cfg_val(cfg.get("lmax_drop_mult", None)) if lmax_drop else None
     lr_low = lr * drop_mult if (drop_mult is not None and not np.isnan(lr)) else None
+
+    if lr_low is None and lr_drop_to is not None:
+        lr_low = lr_drop_to
+        if not np.isnan(lr) and lr != 0:
+            drop_mult = lr_low / lr
+        if t_star is None:
+            t_star = lr_drop_at_step
 
     # fallback: parse lrdrop from run name e.g. "lrdrop0.1"
     if lr_low is None and "lrdrop" in run.name.lower():
         m = re.search(r'lrdrop([0-9.eE+-]+)', run.name, re.IGNORECASE)
         if m:
-            mult = float(m.group(1))
-            lr_low = lr * mult
+            drop_mult = float(m.group(1))
+            lr_low = lr * drop_mult
 
     init_seed = _cfg_val(cfg.get("init_seed", cfg.get("seed", None)))
     # fallback: parse seed from run name e.g. "_seed1234"
@@ -903,7 +924,9 @@ def main(args):
         cls_tag = "-" + "_".join(f"cls{c[0]}v{c[1]}" for c in sorted(cls_set))
     else:
         cls_tag = ""
-    out = f"{optimizer}-{model}-{loss}-{n_seeds}seeds-multiseed{cls_tag}.pdf"
+    out_dir = Path(__file__).resolve().parent / "plots"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{optimizer}-{model}-{loss}-{n_seeds}seeds-multiseed{cls_tag}.pdf"
     fig.savefig(out, bbox_inches="tight", pad_inches=0.06)
     print(f"\nSaved → {out}")
     plt.close(fig)
